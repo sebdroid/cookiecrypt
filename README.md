@@ -1,7 +1,7 @@
 # cookiecrypt
 > http.handlers.cookiecrypt
 
-![Go Workflow](https://github.com/sebdroid/cookiecrypt/actions/workflows/go.yml/badge.svg) [![Go Report Card](https://goreportcard.com/badge/github.com/sebdroid/cookiecrypt)](https://goreportcard.com/badge/github.com/sebdroid/cookiecrypt)
+[![Go Build](https://github.com/sebdroid/cookiecrypt/actions/workflows/go.yml/badge.svg)](https://github.com/sebdroid/cookiecrypt/actions/workflows/go.yml) [![Go Report Card](https://goreportcard.com/badge/github.com/sebdroid/cookiecrypt)](https://goreportcard.com/report/github.com/sebdroid/cookiecrypt)
 
 Caddy HTTP Middleware to encrypt/decrypt cookies in transit
 
