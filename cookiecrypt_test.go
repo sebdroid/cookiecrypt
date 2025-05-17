@@ -101,11 +101,11 @@ func TestParseFull(t *testing.T) {
 
 	helper := httpcaddyfile.Helper{
 		Dispenser: caddyfile.NewTestDispenser(`cookiecrypt {
-			key "b114d13fbe83352d37b8d0d2129d7d91"
-			prefix "cc_"
-			allowlist "TEST" "TEST2"
-			denylist "TEST3" "TEST4"
-		}`),
+                        key "b114d13fbe83352d37b8d0d2129d7d91"
+                        prefix "cc_"
+                        allowlist "TEST" "TEST2"
+                        denylist "TEST3" "TEST4"
+                }`),
 	}
 
 	expected := CookieCrypt{
@@ -129,11 +129,11 @@ func TestParseInvalid(t *testing.T) {
 
 	helper := httpcaddyfile.Helper{
 		Dispenser: caddyfile.NewTestDispenser(`cookiecrypt {
-			key "b114d13fbe83352d37b8d0d2129d7d9"
-			prefix "cc_"
-			allowlist "TEST" "TEST2"
-			denylist "TEST3" "TEST4"
-		}`),
+                        key "b114d13fbe83352d37b8d0d2129d7d9"
+                        prefix "cc_"
+                        allowlist "TEST" "TEST2"
+                        denylist "TEST3" "TEST4"
+                }`),
 	}
 
 	a.Error(fmt.Errorf(""), cc.UnmarshalCaddyfile(helper.Dispenser))
@@ -145,9 +145,9 @@ func TestParsePartial(t *testing.T) {
 
 	helper := httpcaddyfile.Helper{
 		Dispenser: caddyfile.NewTestDispenser(`cookiecrypt {
-			key "b114d13fbe83352d37b8d0d2129d7d91"
-			prefix ""
-		}`),
+                        key "b114d13fbe83352d37b8d0d2129d7d91"
+                        prefix ""
+                }`),
 	}
 
 	expected := CookieCrypt{
