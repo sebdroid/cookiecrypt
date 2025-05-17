@@ -1,5 +1,4 @@
-// go.mod
-module caddy-cookiecrypt
+module github.com/sebdroid/cookiecrypt
 
 go 1.24
 
