@@ -6,7 +6,7 @@ toolchain go1.24.3
 
 require (
 	github.com/caddyserver/caddy/v2 v2.10.0
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.0
 	go.uber.org/zap v1.27.0
 )
 
