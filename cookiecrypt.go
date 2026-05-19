@@ -1,11 +1,14 @@
 package cookiecrypt
 
 import (
+	"bufio"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
+	"io"
+	"net"
 	"net/http"
 	"strings"
 
@@ -196,6 +199,28 @@ func (w *cookieInterceptResponseWriter) WriteHeader(statusCode int) {
 	w.ResponseWriter.WriteHeader(statusCode)
 }
 
+func (w *cookieInterceptResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	hj, ok := w.ResponseWriter.(http.Hijacker)
+	if !ok {
+		return nil, nil, http.ErrNotSupported
+	}
+
+	return hj.Hijack()
+}
+
+func (w *cookieInterceptResponseWriter) Flush() {
+	if fl, ok := w.ResponseWriter.(http.Flusher); ok {
+		fl.Flush()
+	}
+}
+
+func (w *cookieInterceptResponseWriter) ReadFrom(r io.Reader) (int64, error) {
+	if rf, ok := w.ResponseWriter.(io.ReaderFrom); ok {
+		return rf.ReadFrom(r)
+	}
+	return io.Copy(w, r)
+}
+
 func (cc CookieCrypt) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
 	for _, c := range r.Cookies() {
 		if !strings.HasPrefix(c.Name, cc.Prefix) {
@@ -232,4 +257,7 @@ var (
 	_ caddy.Validator             = (*CookieCrypt)(nil)
 	_ caddyhttp.MiddlewareHandler = (*CookieCrypt)(nil)
 	_ caddyfile.Unmarshaler       = (*CookieCrypt)(nil)
+	_ http.Hijacker               = (*cookieInterceptResponseWriter)(nil)
+	_ http.Flusher                = (*cookieInterceptResponseWriter)(nil)
+	_ io.ReaderFrom               = (*cookieInterceptResponseWriter)(nil)
 )
