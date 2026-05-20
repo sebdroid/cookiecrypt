@@ -200,16 +200,53 @@ func (w *cookieInterceptResponseWriter) WriteHeader(statusCode int) {
 }
 
 func (w *cookieInterceptResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
-	hj, ok := w.ResponseWriter.(http.Hijacker)
-	if !ok {
-		w.logger.Error("underlying ResponseWriter does not support Hijack",
-			zap.String("underlying_type", fmt.Sprintf("%T", w.ResponseWriter)))
-		return nil, nil, http.ErrNotSupported
-	}
+	return hijackResponseWriter(w.ResponseWriter, w.logger)
+}
 
-	w.logger.Debug("delegating Hijack to underlying ResponseWriter",
-		zap.String("underlying_type", fmt.Sprintf("%T", w.ResponseWriter)))
-	return hj.Hijack()
+func (w *cookieInterceptResponseWriter) Unwrap() http.ResponseWriter {
+	return w.ResponseWriter
+}
+
+func hijackResponseWriter(rw http.ResponseWriter, logger *zap.Logger) (net.Conn, *bufio.ReadWriter, error) {
+	chain := []string{}
+	for {
+		chain = append(chain, fmt.Sprintf("%T", rw))
+		if hj, ok := rw.(http.Hijacker); ok {
+			logger.Debug("found hijack-capable writer in chain",
+				zap.String("writer_type", fmt.Sprintf("%T", rw)),
+				zap.Strings("writer_chain", chain),
+			)
+			return hj.Hijack()
+		}
+		uw, ok := rw.(interface{ Unwrap() http.ResponseWriter })
+		if !ok {
+			logger.Error("no hijack support found in response writer chain",
+				zap.Strings("writer_chain", chain),
+			)
+			return nil, nil, http.ErrNotSupported
+		}
+		rw = uw.Unwrap()
+	}
+}
+
+func responseWriterChain(rw http.ResponseWriter) []string {
+	chain := []string{}
+	seen := map[http.ResponseWriter]struct{}{}
+	for {
+		typeName := fmt.Sprintf("%T", rw)
+		chain = append(chain, typeName)
+		if _, ok := seen[rw]; ok {
+			chain = append(chain, "<cycle detected>")
+			return chain
+		}
+		seen[rw] = struct{}{}
+
+		uw, ok := rw.(interface{ Unwrap() http.ResponseWriter })
+		if !ok {
+			return chain
+		}
+		rw = uw.Unwrap()
+	}
 }
 
 func (w *cookieInterceptResponseWriter) Flush() {
@@ -229,11 +266,17 @@ func (cc CookieCrypt) ServeHTTP(w http.ResponseWriter, r *http.Request, next cad
 	_, supportsHijack := w.(http.Hijacker)
 	_, supportsFlusher := w.(http.Flusher)
 	_, supportsReaderFrom := w.(io.ReaderFrom)
+	_, supportsUnwrap := w.(interface{ Unwrap() http.ResponseWriter })
 	cc.logger.Debug("cookiecrypt wrapping response writer",
 		zap.String("response_writer_type", fmt.Sprintf("%T", w)),
 		zap.Bool("supports_hijack", supportsHijack),
 		zap.Bool("supports_flusher", supportsFlusher),
 		zap.Bool("supports_reader_from", supportsReaderFrom),
+		zap.Bool("supports_unwrap", supportsUnwrap),
+	)
+
+	cc.logger.Debug("cookiecrypt response writer chain",
+		zap.Strings("writer_chain", responseWriterChain(w)),
 	)
 
 	for _, c := range r.Cookies() {
