@@ -202,9 +202,13 @@ func (w *cookieInterceptResponseWriter) WriteHeader(statusCode int) {
 func (w *cookieInterceptResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	hj, ok := w.ResponseWriter.(http.Hijacker)
 	if !ok {
+		w.logger.Error("underlying ResponseWriter does not support Hijack",
+			zap.String("underlying_type", fmt.Sprintf("%T", w.ResponseWriter)))
 		return nil, nil, http.ErrNotSupported
 	}
 
+	w.logger.Debug("delegating Hijack to underlying ResponseWriter",
+		zap.String("underlying_type", fmt.Sprintf("%T", w.ResponseWriter)))
 	return hj.Hijack()
 }
 
@@ -221,34 +225,16 @@ func (w *cookieInterceptResponseWriter) ReadFrom(r io.Reader) (int64, error) {
 	return io.Copy(w, r)
 }
 
-func shouldBypass(r *http.Request) bool {
-	// Do not intercept or modify cookies for protocol upgrade requests.
-	// These are typically WebSocket handshakes handled separately.
-	if strings.EqualFold(r.Header.Get("Upgrade"), "websocket") {
-		return true
-	}
-
-	// Some WebSocket requests use the Sec-WebSocket-Key header without
-	// an Upgrade header in certain proxy scenarios.
-	if r.Header.Get("Sec-WebSocket-Key") != "" {
-		return true
-	}
-
-	// CONNECT requests are tunneling protocols and should bypass cookie
-	// encryption/decryption logic entirely.
-	if r.Method == http.MethodConnect {
-		return true
-	}
-
-	return false
-}
-
 func (cc CookieCrypt) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
-	// Bypass cookie processing for WebSocket upgrade and CONNECT requests to avoid interference with protocol handshakes.
-	if shouldBypass(r) {
-		cc.logger.Info("bypassing cookiecrypt for websocket or CONNECT request")
-		return next.ServeHTTP(w, r)
-	}
+	_, supportsHijack := w.(http.Hijacker)
+	_, supportsFlusher := w.(http.Flusher)
+	_, supportsReaderFrom := w.(io.ReaderFrom)
+	cc.logger.Debug("cookiecrypt wrapping response writer",
+		zap.String("response_writer_type", fmt.Sprintf("%T", w)),
+		zap.Bool("supports_hijack", supportsHijack),
+		zap.Bool("supports_flusher", supportsFlusher),
+		zap.Bool("supports_reader_from", supportsReaderFrom),
+	)
 
 	for _, c := range r.Cookies() {
 		if !strings.HasPrefix(c.Name, cc.Prefix) {
