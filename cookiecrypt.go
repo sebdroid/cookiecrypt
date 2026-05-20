@@ -221,7 +221,35 @@ func (w *cookieInterceptResponseWriter) ReadFrom(r io.Reader) (int64, error) {
 	return io.Copy(w, r)
 }
 
+func shouldBypass(r *http.Request) bool {
+	// Do not intercept or modify cookies for protocol upgrade requests.
+	// These are typically WebSocket handshakes handled separately.
+	if strings.EqualFold(r.Header.Get("Upgrade"), "websocket") {
+		return true
+	}
+
+	// Some WebSocket requests use the Sec-WebSocket-Key header without
+	// an Upgrade header in certain proxy scenarios.
+	if r.Header.Get("Sec-WebSocket-Key") != "" {
+		return true
+	}
+
+	// CONNECT requests are tunneling protocols and should bypass cookie
+	// encryption/decryption logic entirely.
+	if r.Method == http.MethodConnect {
+		return true
+	}
+
+	return false
+}
+
 func (cc CookieCrypt) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
+	// Bypass cookie processing for WebSocket upgrade and CONNECT requests to avoid interference with protocol handshakes.
+	if shouldBypass(r) {
+		cc.logger.Info("bypassing cookiecrypt for websocket or CONNECT request")
+		return next.ServeHTTP(w, r)
+	}
+
 	for _, c := range r.Cookies() {
 		if !strings.HasPrefix(c.Name, cc.Prefix) {
 			continue
