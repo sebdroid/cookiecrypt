@@ -136,6 +136,10 @@ func (cc *CookieCrypt) decrypt(ciphertext string) (string, error) {
 	return string(plaintext), nil
 }
 
+// cookieInterceptResponseWriter wraps the downstream ResponseWriter and
+// preserves optional interfaces such as Hijacker, Flusher, and ReadFrom.
+// The Unwrap/Hijack support is needed so Caddy's ResponseController can
+// traverse wrapper layers and still upgrade WebSocket/CONNECT connections.
 type cookieInterceptResponseWriter struct {
 	http.ResponseWriter
 	logger        *zap.Logger
@@ -199,14 +203,21 @@ func (w *cookieInterceptResponseWriter) WriteHeader(statusCode int) {
 	w.ResponseWriter.WriteHeader(statusCode)
 }
 
+// Hijack delegates through wrapper layers to the first real http.Hijacker.
+// This is required because Caddy may wrap the original ResponseWriter in
+// layers such as headers.responseWriterWrapper and caddyhttp.responseRecorder.
 func (w *cookieInterceptResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	return hijackResponseWriter(w.ResponseWriter, w.logger)
 }
 
+// Unwrap exposes the next underlying ResponseWriter so http.NewResponseController
+// can traverse the wrapper chain and find optional interfaces like Hijacker.
 func (w *cookieInterceptResponseWriter) Unwrap() http.ResponseWriter {
 	return w.ResponseWriter
 }
 
+// hijackResponseWriter walks nested Unwrap() wrappers until it finds a Hijacker.
+// If none is found, it returns http.ErrNotSupported to preserve standard Go semantics.
 func hijackResponseWriter(rw http.ResponseWriter, logger *zap.Logger) (net.Conn, *bufio.ReadWriter, error) {
 	chain := []string{}
 	for {
@@ -229,26 +240,6 @@ func hijackResponseWriter(rw http.ResponseWriter, logger *zap.Logger) (net.Conn,
 	}
 }
 
-func responseWriterChain(rw http.ResponseWriter) []string {
-	chain := []string{}
-	seen := map[http.ResponseWriter]struct{}{}
-	for {
-		typeName := fmt.Sprintf("%T", rw)
-		chain = append(chain, typeName)
-		if _, ok := seen[rw]; ok {
-			chain = append(chain, "<cycle detected>")
-			return chain
-		}
-		seen[rw] = struct{}{}
-
-		uw, ok := rw.(interface{ Unwrap() http.ResponseWriter })
-		if !ok {
-			return chain
-		}
-		rw = uw.Unwrap()
-	}
-}
-
 func (w *cookieInterceptResponseWriter) Flush() {
 	if fl, ok := w.ResponseWriter.(http.Flusher); ok {
 		fl.Flush()
@@ -263,22 +254,6 @@ func (w *cookieInterceptResponseWriter) ReadFrom(r io.Reader) (int64, error) {
 }
 
 func (cc CookieCrypt) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
-	_, supportsHijack := w.(http.Hijacker)
-	_, supportsFlusher := w.(http.Flusher)
-	_, supportsReaderFrom := w.(io.ReaderFrom)
-	_, supportsUnwrap := w.(interface{ Unwrap() http.ResponseWriter })
-	cc.logger.Debug("cookiecrypt wrapping response writer",
-		zap.String("response_writer_type", fmt.Sprintf("%T", w)),
-		zap.Bool("supports_hijack", supportsHijack),
-		zap.Bool("supports_flusher", supportsFlusher),
-		zap.Bool("supports_reader_from", supportsReaderFrom),
-		zap.Bool("supports_unwrap", supportsUnwrap),
-	)
-
-	cc.logger.Debug("cookiecrypt response writer chain",
-		zap.Strings("writer_chain", responseWriterChain(w)),
-	)
-
 	for _, c := range r.Cookies() {
 		if !strings.HasPrefix(c.Name, cc.Prefix) {
 			continue
