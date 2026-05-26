@@ -39,10 +39,14 @@ func (CookieCrypt) CaddyModule() caddy.ModuleInfo {
 
 func (cc *CookieCrypt) Provision(ctx caddy.Context) error {
 	cc.logger = ctx.Logger()
+	repl := caddy.NewReplacer()
 
 	if cc.Prefix == "" {
 		cc.Prefix = "cc_"
 	}
+
+	// Replace placeholders in the Key such as {file./path/to/secret-key.txt}
+	cc.Key = repl.ReplaceAll(cc.Key, "")
 
 	return nil
 }
