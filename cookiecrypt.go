@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/caddyserver/caddy/v2"
@@ -91,19 +92,15 @@ func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error)
 
 func (cc *CookieCrypt) shouldProcess(name string) bool {
 	if len(cc.Allowlist) > 0 {
-		for _, a := range cc.Allowlist {
-			if a == name {
-				return true
-			}
+		if slices.Contains(cc.Allowlist, name) {
+			return true
 		}
 		cc.logger.Info("cookie not in allowlist", zap.String("cookie", name))
 		return false
 	}
-	for _, d := range cc.Denylist {
-		if d == name {
-			cc.logger.Info("cookie in denylist", zap.String("cookie", name))
-			return false
-		}
+	if slices.Contains(cc.Denylist, name) {
+		cc.logger.Info("cookie in denylist", zap.String("cookie", name))
+		return false
 	}
 	return true
 }
