@@ -126,7 +126,7 @@ func TestResponseAttributesVerbatim(t *testing.T) {
 	lines := rec.Header().Values("Set-Cookie")
 	require.Len(t, lines, 1)
 	// Unknown attributes survive because the splice is verbatim, unlike
-	// http.ParseSetCookie which drops what it does not recognize.
+	// http.ParseSetCookie which drops what it does not recognise.
 	assert.True(t, strings.HasSuffix(lines[0], attrs), lines[0])
 }
 

@@ -70,7 +70,7 @@ func (w *cookieInterceptResponseWriter) processSetCookies() {
 
 // transformSetCookie encrypts one Set-Cookie line, splitting it when it
 // exceeds MaxCookieSize. Attributes are spliced verbatim — http.ParseSetCookie
-// would drop ones it doesn't recognize. Returns nil to drop the line: on
+// would drop ones it doesn't recognise. Returns nil to drop the line: on
 // error, plaintext is never emitted.
 func (cc *CookieCrypt) transformSetCookie(raw string) []string {
 	name, value, ok := strings.Cut(raw, "=")
