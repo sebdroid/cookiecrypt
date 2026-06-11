@@ -14,7 +14,8 @@ import (
 // header-write time. Write, ReadFrom, and Flush force the implicit 200
 // through this wrapper so plaintext cookies cannot leak past it; the embedded
 // wrapper's Unwrap keeps http.ResponseController (Caddy's Flush/Hijack)
-// working. Hijacked 101/upgrade responses bypass header processing.
+// working. Hijacked responses (101 upgrades) never reach WriteHeader, so
+// they bypass header processing.
 type cookieInterceptResponseWriter struct {
 	*caddyhttp.ResponseWriterWrapper
 	cc          *CookieCrypt

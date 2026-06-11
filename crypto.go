@@ -116,7 +116,7 @@ func newAEAD(cipherName string, key []byte) (cipher.AEAD, error) {
 		aead, err := chacha20poly1305.New(key)
 		if err != nil {
 			if fips140.Enabled() {
-				return nil, fmt.Errorf("cipher %s: %w; ChaCha20-Poly1305 is not FIPS-approved — use the default %s, which is",
+				return nil, fmt.Errorf("cipher %s: %w; use the default %s, which is FIPS-approved",
 					CipherChaCha20Poly1305, err, CipherAESGCM)
 			}
 			return nil, fmt.Errorf("cipher %s: %w", CipherChaCha20Poly1305, err)
