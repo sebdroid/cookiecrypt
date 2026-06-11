@@ -1,7 +1,9 @@
 package cookiecrypt
 
 import (
+	"bufio"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -265,6 +267,37 @@ func TestResponseSplitting(t *testing.T) {
 		rec := runResponse(t, cc, setCookieHandler([]string{"big=" + veryLong}, nil))
 		assert.Empty(t, rec.Header().Values("Set-Cookie"))
 	})
+}
+
+// hijackableRecorder simulates a hijackable connection (e.g. a WebSocket
+// upgrade) that httptest.ResponseRecorder cannot.
+type hijackableRecorder struct {
+	*httptest.ResponseRecorder
+	hijacked bool
+}
+
+func (h *hijackableRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	h.hijacked = true
+	conn, _ := net.Pipe()
+	return conn, bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn)), nil
+}
+
+func TestResponseWriterHijack(t *testing.T) {
+	// Regression for "can't switch protocols using non-Hijacker
+	// ResponseWriter": Caddy's reverse proxy hijacks via
+	// http.ResponseController, which must reach the underlying writer
+	// through Unwrap.
+	cc := newCC(t, nil)
+	rec := &hijackableRecorder{ResponseRecorder: httptest.NewRecorder()}
+	req := httptest.NewRequest(http.MethodGet, "https://example.com/", nil)
+
+	next := caddyhttp.HandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
+		conn, _, err := http.NewResponseController(w).Hijack()
+		require.NoError(t, err)
+		return conn.Close()
+	})
+	require.NoError(t, cc.ServeHTTP(rec, req, next))
+	assert.True(t, rec.hijacked)
 }
 
 func TestResponseWriterUnwrap(t *testing.T) {

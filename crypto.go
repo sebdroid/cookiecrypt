@@ -54,7 +54,8 @@ func (cc *CookieCrypt) provision() error {
 		if err != nil {
 			return fmt.Errorf("key %d: %w", i+1, err)
 		}
-		raw, err := hex.DecodeString(resolved)
+		// Keys from {file.*} placeholders often carry stray whitespace.
+		raw, err := hex.DecodeString(strings.TrimSpace(resolved))
 		if err != nil {
 			return fmt.Errorf("key %d: %w: not valid hex: %v", i+1, ErrInvalidKey, err)
 		}

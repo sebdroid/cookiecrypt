@@ -3,11 +3,13 @@ package cookiecrypt
 import (
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/fips140"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -81,6 +83,19 @@ func TestProvisionKeys(t *testing.T) {
 		err := cc.provision()
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "COOKIECRYPT_TEST_UNSET")
+	})
+
+	t.Run("file placeholder", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "cookiecrypt.key")
+		require.NoError(t, os.WriteFile(path, []byte(testKey1+"\n"), 0o600))
+		cc := &CookieCrypt{Keys: []string{"{file." + path + "}"}}
+		require.NoError(t, cc.provision())
+		assert.Len(t, cc.aeads, 1)
+	})
+
+	t.Run("missing key file", func(t *testing.T) {
+		cc := &CookieCrypt{Keys: []string{"{file./nonexistent/cookiecrypt.key}"}}
+		assert.Error(t, cc.provision())
 	})
 
 	t.Run("unknown cipher", func(t *testing.T) {
@@ -223,10 +238,12 @@ func TestDecryptRejects(t *testing.T) {
 
 // TestFIPSOnlyMode re-executes this test in a child process with
 // GODEBUG=fips140=only: the default AES-GCM cipher must keep working (it uses
-// NewGCMWithRandomNonce, the FIPS-approved construction), and chacha20-poly1305
-// must fail at provision with guidance pointing at aes-gcm.
+// NewGCMWithRandomNonce, the FIPS-approved construction), and on Go 1.26+
+// chacha20-poly1305 must fail at provision with guidance pointing at aes-gcm.
 func TestFIPSOnlyMode(t *testing.T) {
 	if os.Getenv("COOKIECRYPT_FIPS_CHILD") == "1" {
+		require.True(t, fips140.Enabled(), "GODEBUG=fips140=only did not engage")
+
 		cc := &CookieCrypt{Keys: []string{testKey1}}
 		require.NoError(t, cc.provision())
 		ct, err := encrypt(cc.aeads[0], "session", "value")
@@ -237,6 +254,10 @@ func TestFIPSOnlyMode(t *testing.T) {
 
 		chacha := &CookieCrypt{Keys: []string{testKey1}, Cipher: CipherChaCha20Poly1305}
 		err = chacha.provision()
+		if !chachaFIPSEnforced {
+			require.NoError(t, err) // pre-1.26 x/crypto cannot detect FIPS-only mode
+			return
+		}
 		require.Error(t, err)
 		require.Contains(t, err.Error(), CipherChaCha20Poly1305)
 		require.Contains(t, err.Error(), CipherAESGCM) // actionable guidance

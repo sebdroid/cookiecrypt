@@ -20,6 +20,9 @@ To build locally, use [`xcaddy`](https://github.com/caddyserver/xcaddy):
 xcaddy build --with github.com/sebdroid/cookiecrypt
 ```
 
+> [!IMPORTANT]
+> Requires Caddy v2.11.2 or newer - the oldest release that supports this module's cryptography and has no known vulnerabilities in its dependencies. Building with any newer Caddy works automatically: Go always selects the newer of your Caddy version and this minimum.
+
 ## Sample Caddyfile
 
 ```Caddyfile
@@ -41,7 +44,8 @@ Generate a key with:
 openssl rand -hex 32
 ```
 
-Prefer `{env.NAME}` placeholders over inline keys so the secret stays out of your Caddyfile.
+> [!TIP]
+> Keep secrets out of your Caddyfile with placeholders: `{env.COOKIECRYPT_KEY}` reads an environment variable, `{file./run/secrets/cookiecrypt.key}` reads the key from a file. Both are resolved once, when the config loads.
 
 ## Configuration
 
@@ -76,11 +80,13 @@ Patterns in both lists are [`path.Match`](https://pkg.go.dev/path#Match) globs: 
 | `aes-gcm` (default) | AES-256-GCM, NIST SP 800-38D | FIPS-approved, hardware-accelerated on most CPUs  |
 | `chacha20-poly1305` | RFC 8439                     | Faster on CPUs without AES instructions; not FIPS |
 
-**FIPS environments:** Only `aes-gcm` works under `GODEBUG=fips140=only`. `chacha20-poly1305` is not an approved algorithm; in FIPS-only mode Caddy refuses to load the config with an error pointing back to `aes-gcm`.
+> [!NOTE]
+> **FIPS environments:** Only `aes-gcm` works under `GODEBUG=fips140=only`. `chacha20-poly1305` is not an approved algorithm; when Caddy is built with Go 1.26 or newer, FIPS-only mode refuses to load a `chacha20-poly1305` config with an error pointing back to `aes-gcm`. Builds on older toolchains cannot detect FIPS-only mode and will run it regardless - build with Go 1.26+ if FIPS compliance matters to you.
 
 ### Key rotation
 
-Rotate on your normal schedule, and always before a single key has protected roughly 4 billion cookies - a hard cryptographic limit shared by both ciphers.
+> [!IMPORTANT]
+> Rotate on your normal schedule, and always before a single key has protected roughly 4 billion cookies - a hard cryptographic limit shared by both ciphers.
 
 1. Generate a new key: `openssl rand -hex 32`.
 2. Put it **first** in the `key` directive, keeping the old key(s) after it:
@@ -107,10 +113,12 @@ Browser-enforced name prefixes stay outermost when renaming: `__Host-session` is
 
 Setting `prefix ""` explicitly removes the prefix entirely: cookie names stay unchanged in the browser (dots are still doubled - see name escaping above) and only values become ciphertext. Since nothing marks a cookie as encrypted, **every** inbound cookie is presumed to be encrypted - it is decrypted, or dropped if decryption fails. Cookies listed in `allow_inbound` or `allow_outbound` that aren't valid ciphertext pass through as ordinary bare cookies (a validly encrypted twin still wins over a plaintext duplicate).
 
+> [!WARNING]
+> Cookies set client-side (JavaScript `document.cookie` - analytics, consent banners) and by other subsystems are dropped unless listed. Audit your traffic and populate `allow_inbound` globs before enabling this mode.
+
 Consequences to weigh before enabling it:
 
 - `block_unencrypted` is effectively always on - a forged or unknown plaintext cookie cannot be decrypted and is dropped.
-- **Cookies set client-side (JavaScript `document.cookie` - analytics, consent banners) and by other subsystems are dropped unless listed.** Audit your traffic and populate `allow_inbound` globs first.
 - `__Host-`/`__Secure-` prefixes are preserved automatically, since names never change.
 - There is no reserved namespace to collide with.
 
