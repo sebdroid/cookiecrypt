@@ -130,4 +130,4 @@ Per-cookie success events log at `DEBUG`. Dropped cookies (failed decryption, sh
 
 ## Licence
 
-cookiecrypt is licensed under the [Apache License 2.0](LICENSE): use it, modify it, and redistribute it freely, commercially or not. Keep the copyright notice and [NOTICE](NOTICE) file intact when you redistribute, and mark any files you change as modified - that keeps the credit with the original work and the responsibility for changes with whoever made them.
+cookiecrypt is licensed under the [Apache License 2.0](LICENSE): use it, modify it, and redistribute it freely, commercially or not. When you redistribute, include the licence, carry forward the attribution notices from the [NOTICE](NOTICE) file, and mark any files you change as modified - that keeps the credit with the original work and the responsibility for changes with whoever made them.
