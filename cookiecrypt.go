@@ -13,10 +13,8 @@ import (
 	"go.uber.org/zap"
 )
 
-// CookieCrypt encrypts every outbound Set-Cookie (AES-256-GCM by default,
-// AAD-bound to the cookie's name) and transparently decrypts the matching
-// cookies on inbound requests.
-type CookieCrypt struct {
+// Cookiecrypt is Caddy HTTP middleware that encrypts cookies in transit.
+type Cookiecrypt struct {
 	// Keys are 64-char hex strings (32 raw bytes each). The first key
 	// encrypts; all keys are tried on decrypt, enabling rotation.
 	// Placeholders like {env.COOKIECRYPT_KEY} are resolved at provision.
@@ -53,18 +51,18 @@ type CookieCrypt struct {
 }
 
 func init() {
-	caddy.RegisterModule(CookieCrypt{})
+	caddy.RegisterModule(Cookiecrypt{})
 	httpcaddyfile.RegisterHandlerDirective("cookiecrypt", parseCaddyfile)
 }
 
-func (CookieCrypt) CaddyModule() caddy.ModuleInfo {
+func (Cookiecrypt) CaddyModule() caddy.ModuleInfo {
 	return caddy.ModuleInfo{
 		ID:  "http.handlers.cookiecrypt",
-		New: func() caddy.Module { return new(CookieCrypt) },
+		New: func() caddy.Module { return new(Cookiecrypt) },
 	}
 }
 
-func (cc *CookieCrypt) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
+func (cc *Cookiecrypt) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 	d.Next()
 
 	for d.NextBlock(0) {
@@ -131,12 +129,12 @@ func (cc *CookieCrypt) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 }
 
 func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error) {
-	cc := new(CookieCrypt)
+	cc := new(Cookiecrypt)
 	err := cc.UnmarshalCaddyfile(h.Dispenser)
 	return cc, err
 }
 
-func (cc *CookieCrypt) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
+func (cc *Cookiecrypt) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
 	cc.processRequestCookies(r)
 
 	rw := &cookieInterceptResponseWriter{
@@ -158,7 +156,7 @@ type cookieSegment struct {
 // processRequestCookies decrypts prefixed cookies, reassembles split ones,
 // enforces the shadow rule and block_unencrypted, and rebuilds the Cookie
 // header — but only if anything actually changed.
-func (cc *CookieCrypt) processRequestCookies(r *http.Request) {
+func (cc *Cookiecrypt) processRequestCookies(r *http.Request) {
 	headerVals := r.Header.Values("Cookie")
 	if len(headerVals) == 0 {
 		return
@@ -371,8 +369,8 @@ func (cc *CookieCrypt) processRequestCookies(r *http.Request) {
 }
 
 var (
-	_ caddy.Provisioner           = (*CookieCrypt)(nil)
-	_ caddy.Validator             = (*CookieCrypt)(nil)
-	_ caddyhttp.MiddlewareHandler = (*CookieCrypt)(nil)
-	_ caddyfile.Unmarshaler       = (*CookieCrypt)(nil)
+	_ caddy.Provisioner           = (*Cookiecrypt)(nil)
+	_ caddy.Validator             = (*Cookiecrypt)(nil)
+	_ caddyhttp.MiddlewareHandler = (*Cookiecrypt)(nil)
+	_ caddyfile.Unmarshaler       = (*Cookiecrypt)(nil)
 )

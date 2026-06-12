@@ -16,7 +16,7 @@ import (
 
 // runRequest sends a request with the given Cookie headers through the
 // middleware and returns the request as the next handler saw it.
-func runRequest(t *testing.T, cc *CookieCrypt, cookieHeaders ...string) *http.Request {
+func runRequest(t *testing.T, cc *Cookiecrypt, cookieHeaders ...string) *http.Request {
 	t.Helper()
 	req := httptest.NewRequest(http.MethodGet, "https://example.com/", nil)
 	for _, h := range cookieHeaders {
@@ -71,7 +71,7 @@ func splitCT(encName, ct string, count int) []string {
 
 func TestUnmarshalCaddyfile(t *testing.T) {
 	t.Run("full", func(t *testing.T) {
-		cc := new(CookieCrypt)
+		cc := new(Cookiecrypt)
 		d := caddyfile.NewTestDispenser(`cookiecrypt {
 			key ` + testKey1 + ` ` + testKey2 + `
 			key ` + testKey1 + `
@@ -98,7 +98,7 @@ func TestUnmarshalCaddyfile(t *testing.T) {
 	})
 
 	t.Run("unknown directive", func(t *testing.T) {
-		cc := new(CookieCrypt)
+		cc := new(Cookiecrypt)
 		d := caddyfile.NewTestDispenser(`cookiecrypt {
 			allowlist A B
 		}`)
@@ -106,7 +106,7 @@ func TestUnmarshalCaddyfile(t *testing.T) {
 	})
 
 	t.Run("flag with argument", func(t *testing.T) {
-		cc := new(CookieCrypt)
+		cc := new(Cookiecrypt)
 		d := caddyfile.NewTestDispenser(`cookiecrypt {
 			block_unencrypted yes
 		}`)
@@ -114,7 +114,7 @@ func TestUnmarshalCaddyfile(t *testing.T) {
 	})
 
 	t.Run("key without argument", func(t *testing.T) {
-		cc := new(CookieCrypt)
+		cc := new(Cookiecrypt)
 		d := caddyfile.NewTestDispenser(`cookiecrypt {
 			key
 		}`)
@@ -122,7 +122,7 @@ func TestUnmarshalCaddyfile(t *testing.T) {
 	})
 
 	t.Run("non-numeric max_cookie_size", func(t *testing.T) {
-		cc := new(CookieCrypt)
+		cc := new(Cookiecrypt)
 		d := caddyfile.NewTestDispenser(`cookiecrypt {
 			max_cookie_size big
 		}`)
@@ -139,7 +139,7 @@ func TestUnmarshalCaddyfile(t *testing.T) {
 			"secure on",       // flags take no args
 			"httponly on",
 		} {
-			cc := new(CookieCrypt)
+			cc := new(Cookiecrypt)
 			d := caddyfile.NewTestDispenser("cookiecrypt {\n\t" + directive + "\n}")
 			assert.Error(t, cc.UnmarshalCaddyfile(d), directive)
 		}
@@ -154,7 +154,7 @@ func TestParseCaddyfileHelper(t *testing.T) {
 	}
 	handler, err := parseCaddyfile(h)
 	require.NoError(t, err)
-	cc, ok := handler.(*CookieCrypt)
+	cc, ok := handler.(*Cookiecrypt)
 	require.True(t, ok)
 	assert.Equal(t, []string{testKey1}, cc.Keys)
 
@@ -250,7 +250,7 @@ func TestShadowRule(t *testing.T) {
 	})
 
 	t.Run("allow_inbound does not bypass shadowing", func(t *testing.T) {
-		cc := newCC(t, func(cc *CookieCrypt) { cc.AllowInbound = []string{"X"} })
+		cc := newCC(t, func(cc *Cookiecrypt) { cc.AllowInbound = []string{"X"} })
 		m := cookieMap(runRequest(t, cc, "cc_X=garbage; X=forged"))
 		assert.NotContains(t, m, "X")
 	})
@@ -264,13 +264,13 @@ func TestShadowRule(t *testing.T) {
 
 func TestAllowOutboundShadowException(t *testing.T) {
 	t.Run("garbage ciphertext cannot evict bare cookie", func(t *testing.T) {
-		cc := newCC(t, func(cc *CookieCrypt) { cc.AllowOutbound = []string{"session"} })
+		cc := newCC(t, func(cc *Cookiecrypt) { cc.AllowOutbound = []string{"session"} })
 		m := cookieMap(runRequest(t, cc, "cc_session=garbage; session=legit"))
 		assert.Equal(t, "legit", m["session"])
 	})
 
 	t.Run("valid ciphertext still wins", func(t *testing.T) {
-		cc := newCC(t, func(cc *CookieCrypt) { cc.AllowOutbound = []string{"session"} })
+		cc := newCC(t, func(cc *Cookiecrypt) { cc.AllowOutbound = []string{"session"} })
 		ct := mustEncrypt(t, cc, "session", "migrated")
 		m := cookieMap(runRequest(t, cc, "cc_session="+ct+"; session=old"))
 		assert.Equal(t, "migrated", m["session"])
@@ -301,13 +301,13 @@ func TestBlockUnencrypted(t *testing.T) {
 	})
 
 	t.Run("on drops bare cookies", func(t *testing.T) {
-		cc := newCC(t, func(cc *CookieCrypt) { cc.BlockUnencrypted = true })
+		cc := newCC(t, func(cc *Cookiecrypt) { cc.BlockUnencrypted = true })
 		m := cookieMap(runRequest(t, cc, "plain=1"))
 		assert.Empty(t, m)
 	})
 
 	t.Run("allow_inbound glob exempts", func(t *testing.T) {
-		cc := newCC(t, func(cc *CookieCrypt) {
+		cc := newCC(t, func(cc *Cookiecrypt) {
 			cc.BlockUnencrypted = true
 			cc.AllowInbound = []string{"sso_*"}
 		})
@@ -317,7 +317,7 @@ func TestBlockUnencrypted(t *testing.T) {
 	})
 
 	t.Run("allow_outbound names pass automatically", func(t *testing.T) {
-		cc := newCC(t, func(cc *CookieCrypt) {
+		cc := newCC(t, func(cc *Cookiecrypt) {
 			cc.BlockUnencrypted = true
 			cc.AllowOutbound = []string{"pub"}
 		})
@@ -326,7 +326,7 @@ func TestBlockUnencrypted(t *testing.T) {
 	})
 
 	t.Run("negated allow_outbound names stay blocked", func(t *testing.T) {
-		cc := newCC(t, func(cc *CookieCrypt) {
+		cc := newCC(t, func(cc *Cookiecrypt) {
 			cc.BlockUnencrypted = true
 			cc.AllowOutbound = []string{"*", "!A"}
 		})
@@ -336,7 +336,7 @@ func TestBlockUnencrypted(t *testing.T) {
 	})
 
 	t.Run("negation in one list cannot veto the other", func(t *testing.T) {
-		cc := newCC(t, func(cc *CookieCrypt) {
+		cc := newCC(t, func(cc *Cookiecrypt) {
 			cc.BlockUnencrypted = true
 			cc.AllowInbound = []string{"A"}
 			cc.AllowOutbound = []string{"*", "!A"}
