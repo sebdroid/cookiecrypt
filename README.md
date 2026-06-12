@@ -58,12 +58,14 @@ cookiecrypt {
 	allow_inbound <patterns...>  # exceptions to block_unencrypted
 	allow_outbound <patterns...> # never encrypt these on responses
 	max_cookie_size 4096         # split threshold per Set-Cookie line (min 512)
-	secure                       # append Secure to encrypted Set-Cookies
-	httponly                     # append HttpOnly to encrypted Set-Cookies
+	secure                       # append Secure to encrypted Set-Cookies (default: off)
+	httponly                     # append HttpOnly to encrypted Set-Cookies (default: off)
 }
 ```
 
 JSON config uses the same names: `keys` (array), `cipher`, `prefix`, `block_unencrypted`, `allow_inbound`, `allow_outbound`, `max_cookie_size`, `secure`, `httponly`.
+
+Enable `secure` whenever you serve over HTTPS: encryption stops a stolen cookie being *read*, but not *replayed*, so keeping cookies off plain HTTP still matters.
 
 ### Directional model
 
