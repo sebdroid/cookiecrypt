@@ -1,19 +1,22 @@
 name: Sync README Caddy floor
-# Dependabot's token is read-only by default; this key elevates it so the
-# workflow can push the README fix back to the PR branch.
+
 permissions:
     contents: write
+
 on:
     pull_request:
         paths:
             - go.mod
 
+concurrency:
+    group: readme-sync-${{ github.event.pull_request.number }}
+    cancel-in-progress: true
+
 jobs:
     sync:
-        # Same-repo branches only: fork PRs get a read-only token, and main
-        # is never pushed to directly - only PR branches that change go.mod.
         if: github.event.pull_request.head.repo.full_name == github.repository
         runs-on: ubuntu-latest
+        timeout-minutes: 5
 
         steps:
             - uses: actions/checkout@v6
@@ -21,7 +24,8 @@ jobs:
                   ref: ${{ github.head_ref }}
             - name: Update the README floor to match go.mod
               run: |
-                  CADDY=$(awk '$1 == "github.com/caddyserver/caddy/v2" {print $2}' go.mod)
+                  CADDY=$(awk '$1 == "github.com/caddyserver/caddy/v2" {print $2}
+                               $1 == "require" && $2 == "github.com/caddyserver/caddy/v2" {print $3}' go.mod)
                   # Strict format check: blocks sed injection and skips
                   # pseudo-versions, which do not belong in the README.
                   if ! echo "$CADDY" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
@@ -38,4 +42,4 @@ jobs:
                   git config user.name "github-actions[bot]"
                   git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
                   git commit -am "docs: sync README Caddy floor with go.mod"
-                  git push origin "HEAD:refs/heads/${GITHUB_HEAD_REF}"
+                  git push
