@@ -18,7 +18,7 @@ import (
 // they bypass header processing.
 type cookieInterceptResponseWriter struct {
 	*caddyhttp.ResponseWriterWrapper
-	cc          *CookieCrypt
+	cc          *Cookiecrypt
 	wroteHeader bool
 }
 
@@ -73,7 +73,7 @@ func (w *cookieInterceptResponseWriter) processSetCookies() {
 // exceeds MaxCookieSize. Attributes are spliced verbatim — http.ParseSetCookie
 // would drop ones it doesn't recognise. Returns nil to drop the line: on
 // error, plaintext is never emitted.
-func (cc *CookieCrypt) transformSetCookie(raw string) []string {
+func (cc *Cookiecrypt) transformSetCookie(raw string) []string {
 	name, value, ok := strings.Cut(raw, "=")
 	if !ok {
 		cc.logger.Debug("passing through malformed Set-Cookie line")

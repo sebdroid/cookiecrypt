@@ -28,13 +28,13 @@ const keyBytes = 32
 // splits can't round-trip; the cap also bounds work from forged count headers.
 const maxChunks = 32
 
-func (cc *CookieCrypt) Provision(ctx caddy.Context) error {
+func (cc *Cookiecrypt) Provision(ctx caddy.Context) error {
 	cc.logger = ctx.Logger()
 	return cc.provision()
 }
 
 // provision is Provision minus the caddy.Context dependency, for tests.
-func (cc *CookieCrypt) provision() error {
+func (cc *Cookiecrypt) provision() error {
 	if cc.Prefix == nil {
 		cc.prefix = "cc_"
 	} else {
@@ -72,7 +72,7 @@ func (cc *CookieCrypt) provision() error {
 	return nil
 }
 
-func (cc *CookieCrypt) Validate() error {
+func (cc *Cookiecrypt) Validate() error {
 	if len(cc.Keys) == 0 {
 		return fmt.Errorf("%w: at least one key is required", ErrInvalidKey)
 	}
@@ -140,7 +140,7 @@ func encrypt(aead cipher.AEAD, name, value string) (string, error) {
 
 // decrypt tries every configured key (rotation: first key encrypts, all keys
 // decrypt) with AAD = the cookie's original name.
-func (cc *CookieCrypt) decrypt(name, encoded string) (string, error) {
+func (cc *Cookiecrypt) decrypt(name, encoded string) (string, error) {
 	raw, err := base64.RawURLEncoding.DecodeString(encoded)
 	if err != nil {
 		return "", ErrInvalidCiphertext
@@ -206,7 +206,7 @@ func unescapeName(escaped string) (string, bool) {
 }
 
 // encryptedName maps "X.1" → "cc_X..1" and "__Host-s" → "__Host-cc_s".
-func (cc *CookieCrypt) encryptedName(name string) string {
+func (cc *Cookiecrypt) encryptedName(name string) string {
 	special, base := splitSpecialPrefix(name)
 	return special + cc.prefix + escapeName(base)
 }

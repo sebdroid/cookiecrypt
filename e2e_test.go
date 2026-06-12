@@ -15,7 +15,7 @@ import (
 )
 
 // runResponse drives the middleware's response path with the given handler.
-func runResponse(t *testing.T, cc *CookieCrypt, handler caddyhttp.HandlerFunc) *httptest.ResponseRecorder {
+func runResponse(t *testing.T, cc *Cookiecrypt, handler caddyhttp.HandlerFunc) *httptest.ResponseRecorder {
 	t.Helper()
 	req := httptest.NewRequest(http.MethodGet, "https://example.com/", nil)
 	rec := httptest.NewRecorder()
@@ -153,7 +153,7 @@ func TestResponseDeletionCookie(t *testing.T) {
 }
 
 func TestResponseSecureHTTPOnly(t *testing.T) {
-	cc := newCC(t, func(cc *CookieCrypt) { cc.Secure = true; cc.HTTPOnly = true })
+	cc := newCC(t, func(cc *Cookiecrypt) { cc.Secure = true; cc.HTTPOnly = true })
 
 	t.Run("appended when missing", func(t *testing.T) {
 		rec := runResponse(t, cc, setCookieHandler([]string{"X=v; Path=/"}, nil))
@@ -170,7 +170,7 @@ func TestResponseSecureHTTPOnly(t *testing.T) {
 }
 
 func TestResponseAllowOutbound(t *testing.T) {
-	cc := newCC(t, func(cc *CookieCrypt) {
+	cc := newCC(t, func(cc *Cookiecrypt) {
 		cc.AllowOutbound = []string{"pub_*"}
 		cc.Secure = true
 	})
@@ -186,7 +186,7 @@ func TestResponseAllowOutbound(t *testing.T) {
 
 func TestResponseAllowOutboundNegation(t *testing.T) {
 	// v1 `allowlist A B` (encrypt only A and B) maps to `allow_outbound * !A !B`.
-	cc := newCC(t, func(cc *CookieCrypt) { cc.AllowOutbound = []string{"*", "!A", "!B"} })
+	cc := newCC(t, func(cc *Cookiecrypt) { cc.AllowOutbound = []string{"*", "!A", "!B"} })
 	rec := runResponse(t, cc, setCookieHandler([]string{"A=1", "B=2", "C=3"}, nil))
 
 	lines := rec.Header().Values("Set-Cookie")
@@ -219,19 +219,19 @@ func TestResponseSplitting(t *testing.T) {
 	const attrs = "; Path=/; SameSite=Lax"
 	long := strings.Repeat("v", 2000)
 
-	probe := newCC(t, func(cc *CookieCrypt) { cc.MaxCookieSize = 1 << 20 })
+	probe := newCC(t, func(cc *Cookiecrypt) { cc.MaxCookieSize = 1 << 20 })
 	rec := runResponse(t, probe, setCookieHandler([]string{"big=" + long + attrs}, nil))
 	unsplit := rec.Header().Get("Set-Cookie")
 	require.True(t, strings.HasPrefix(unsplit, "cc_big="), unsplit)
 
 	t.Run("line exactly at the limit stays unsplit", func(t *testing.T) {
-		cc := newCC(t, func(cc *CookieCrypt) { cc.MaxCookieSize = len(unsplit) })
+		cc := newCC(t, func(cc *Cookiecrypt) { cc.MaxCookieSize = len(unsplit) })
 		rec := runResponse(t, cc, setCookieHandler([]string{"big=" + long + attrs}, nil))
 		assert.Len(t, rec.Header().Values("Set-Cookie"), 1)
 	})
 
 	t.Run("one byte over the limit splits", func(t *testing.T) {
-		cc := newCC(t, func(cc *CookieCrypt) { cc.MaxCookieSize = len(unsplit) - 1 })
+		cc := newCC(t, func(cc *Cookiecrypt) { cc.MaxCookieSize = len(unsplit) - 1 })
 		rec := runResponse(t, cc, setCookieHandler([]string{"big=" + long + attrs}, nil))
 		lines := rec.Header().Values("Set-Cookie")
 		require.Greater(t, len(lines), 1)
@@ -252,7 +252,7 @@ func TestResponseSplitting(t *testing.T) {
 	})
 
 	t.Run("attributes exhausting the budget drop the cookie", func(t *testing.T) {
-		cc := newCC(t, func(cc *CookieCrypt) { cc.MaxCookieSize = 600 })
+		cc := newCC(t, func(cc *Cookiecrypt) { cc.MaxCookieSize = 600 })
 		hugeAttrs := "; Path=/" + strings.Repeat("p", 580)
 		rec := runResponse(t, cc, setCookieHandler([]string{"big=" + long + hugeAttrs, "ok=1"}, nil))
 
@@ -262,7 +262,7 @@ func TestResponseSplitting(t *testing.T) {
 	})
 
 	t.Run("value too large for 32 chunks is dropped", func(t *testing.T) {
-		cc := newCC(t, func(cc *CookieCrypt) { cc.MaxCookieSize = 512 })
+		cc := newCC(t, func(cc *Cookiecrypt) { cc.MaxCookieSize = 512 })
 		veryLong := strings.Repeat("v", 32*512)
 		rec := runResponse(t, cc, setCookieHandler([]string{"big=" + veryLong}, nil))
 		assert.Empty(t, rec.Header().Values("Set-Cookie"))
@@ -319,7 +319,7 @@ func TestResponseWriterUnwrap(t *testing.T) {
 }
 
 func TestE2ECustomPrefix(t *testing.T) {
-	cc := newCC(t, func(cc *CookieCrypt) { cc.Prefix = ptr("enc_") })
+	cc := newCC(t, func(cc *Cookiecrypt) { cc.Prefix = ptr("enc_") })
 
 	rec := runResponse(t, cc, setCookieHandler([]string{"session=v; Path=/"}, nil))
 	lines := rec.Header().Values("Set-Cookie")
@@ -350,7 +350,7 @@ func TestPrefixCarryingNames(t *testing.T) {
 	})
 
 	t.Run("listed raw cc_ name passes both directions", func(t *testing.T) {
-		cc := newCC(t, func(cc *CookieCrypt) { cc.AllowOutbound = []string{"cc_legacy"} })
+		cc := newCC(t, func(cc *Cookiecrypt) { cc.AllowOutbound = []string{"cc_legacy"} })
 		rec := runResponse(t, cc, setCookieHandler([]string{"cc_legacy=plain"}, nil))
 		assert.Equal(t, []string{"cc_legacy=plain"}, rec.Header().Values("Set-Cookie"))
 
@@ -359,7 +359,7 @@ func TestPrefixCarryingNames(t *testing.T) {
 	})
 
 	t.Run("allow_inbound raw cc_ name survives block_unencrypted", func(t *testing.T) {
-		cc := newCC(t, func(cc *CookieCrypt) {
+		cc := newCC(t, func(cc *Cookiecrypt) {
 			cc.BlockUnencrypted = true
 			cc.AllowInbound = []string{"cc_legacy"}
 		})
@@ -368,7 +368,7 @@ func TestPrefixCarryingNames(t *testing.T) {
 	})
 
 	t.Run("encrypted twin beats listed bare form", func(t *testing.T) {
-		cc := newCC(t, func(cc *CookieCrypt) { cc.AllowOutbound = []string{"cc_legacy"} })
+		cc := newCC(t, func(cc *Cookiecrypt) { cc.AllowOutbound = []string{"cc_legacy"} })
 		ct := mustEncrypt(t, cc, "cc_legacy", "migrated")
 		m := cookieMap(runRequest(t, cc, "cc_cc_legacy="+ct+"; cc_legacy=old"))
 		assert.Equal(t, "migrated", m["cc_legacy"])
@@ -377,7 +377,7 @@ func TestPrefixCarryingNames(t *testing.T) {
 
 func TestE2ENoPrefix(t *testing.T) {
 	long := strings.Repeat("0123456789", 200) // forces splitting at 1024
-	cc := newCC(t, func(cc *CookieCrypt) {
+	cc := newCC(t, func(cc *Cookiecrypt) {
 		cc.Prefix = ptr("")
 		cc.MaxCookieSize = 1024
 		cc.AllowOutbound = []string{"pub_*"}
@@ -415,7 +415,7 @@ func TestE2ENoPrefix(t *testing.T) {
 }
 
 func TestNoPrefixInbound(t *testing.T) {
-	cc := newCC(t, func(cc *CookieCrypt) {
+	cc := newCC(t, func(cc *Cookiecrypt) {
 		cc.Prefix = ptr("")
 		cc.AllowInbound = []string{"sso_*", "clock", "mp_*"}
 		cc.AllowOutbound = []string{"pub"}
@@ -467,7 +467,7 @@ func TestE2ERoundTrip(t *testing.T) {
 
 	for _, cipherName := range []string{CipherAESGCM, CipherChaCha20Poly1305} {
 		t.Run(cipherName, func(t *testing.T) {
-			cc := newCC(t, func(cc *CookieCrypt) {
+			cc := newCC(t, func(cc *Cookiecrypt) {
 				cc.Cipher = cipherName
 				cc.MaxCookieSize = 1024
 			})

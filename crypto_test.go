@@ -25,9 +25,9 @@ const (
 func ptr[T any](v T) *T { return &v }
 
 // newCC builds a provisioned middleware with sane test defaults.
-func newCC(t *testing.T, mutate func(*CookieCrypt)) *CookieCrypt {
+func newCC(t *testing.T, mutate func(*Cookiecrypt)) *Cookiecrypt {
 	t.Helper()
-	cc := &CookieCrypt{Keys: []string{testKey1}}
+	cc := &Cookiecrypt{Keys: []string{testKey1}}
 	if mutate != nil {
 		mutate(cc)
 	}
@@ -36,7 +36,7 @@ func newCC(t *testing.T, mutate func(*CookieCrypt)) *CookieCrypt {
 	return cc
 }
 
-func mustEncrypt(t *testing.T, cc *CookieCrypt, name, value string) string {
+func mustEncrypt(t *testing.T, cc *Cookiecrypt, name, value string) string {
 	t.Helper()
 	ct, err := encrypt(cc.aeads[0], name, value)
 	require.NoError(t, err)
@@ -45,41 +45,41 @@ func mustEncrypt(t *testing.T, cc *CookieCrypt, name, value string) string {
 
 func TestProvisionKeys(t *testing.T) {
 	t.Run("single key", func(t *testing.T) {
-		cc := &CookieCrypt{Keys: []string{testKey1}}
+		cc := &Cookiecrypt{Keys: []string{testKey1}}
 		require.NoError(t, cc.provision())
 		assert.Len(t, cc.aeads, 1)
 	})
 
 	t.Run("multiple keys", func(t *testing.T) {
-		cc := &CookieCrypt{Keys: []string{testKey1, testKey2}}
+		cc := &Cookiecrypt{Keys: []string{testKey1, testKey2}}
 		require.NoError(t, cc.provision())
 		assert.Len(t, cc.aeads, 2)
 	})
 
 	t.Run("bad hex", func(t *testing.T) {
-		cc := &CookieCrypt{Keys: []string{"zz" + testKey1[2:]}}
+		cc := &Cookiecrypt{Keys: []string{"zz" + testKey1[2:]}}
 		assert.ErrorIs(t, cc.provision(), ErrInvalidKey)
 	})
 
 	t.Run("wrong length", func(t *testing.T) {
-		cc := &CookieCrypt{Keys: []string{testKey1[:32]}}
+		cc := &Cookiecrypt{Keys: []string{testKey1[:32]}}
 		assert.ErrorIs(t, cc.provision(), ErrInvalidKey)
 	})
 
 	t.Run("empty key", func(t *testing.T) {
-		cc := &CookieCrypt{Keys: []string{""}}
+		cc := &Cookiecrypt{Keys: []string{""}}
 		assert.ErrorIs(t, cc.provision(), ErrInvalidKey)
 	})
 
 	t.Run("env placeholder", func(t *testing.T) {
 		t.Setenv("COOKIECRYPT_TEST_KEY", testKey1)
-		cc := &CookieCrypt{Keys: []string{"{env.COOKIECRYPT_TEST_KEY}"}}
+		cc := &Cookiecrypt{Keys: []string{"{env.COOKIECRYPT_TEST_KEY}"}}
 		require.NoError(t, cc.provision())
 		assert.Len(t, cc.aeads, 1)
 	})
 
 	t.Run("unset env placeholder", func(t *testing.T) {
-		cc := &CookieCrypt{Keys: []string{"{env.COOKIECRYPT_TEST_UNSET}"}}
+		cc := &Cookiecrypt{Keys: []string{"{env.COOKIECRYPT_TEST_UNSET}"}}
 		err := cc.provision()
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "COOKIECRYPT_TEST_UNSET")
@@ -88,18 +88,18 @@ func TestProvisionKeys(t *testing.T) {
 	t.Run("file placeholder", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "cookiecrypt.key")
 		require.NoError(t, os.WriteFile(path, []byte(testKey1+"\n"), 0o600))
-		cc := &CookieCrypt{Keys: []string{"{file." + path + "}"}}
+		cc := &Cookiecrypt{Keys: []string{"{file." + path + "}"}}
 		require.NoError(t, cc.provision())
 		assert.Len(t, cc.aeads, 1)
 	})
 
 	t.Run("missing key file", func(t *testing.T) {
-		cc := &CookieCrypt{Keys: []string{"{file./nonexistent/cookiecrypt.key}"}}
+		cc := &Cookiecrypt{Keys: []string{"{file./nonexistent/cookiecrypt.key}"}}
 		assert.Error(t, cc.provision())
 	})
 
 	t.Run("unknown cipher", func(t *testing.T) {
-		cc := &CookieCrypt{Keys: []string{testKey1}, Cipher: "rot13"}
+		cc := &Cookiecrypt{Keys: []string{testKey1}, Cipher: "rot13"}
 		err := cc.provision()
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "unknown cipher")
@@ -114,21 +114,21 @@ func TestProvisionKeys(t *testing.T) {
 	})
 
 	t.Run("omitted prefix defaults to cc_", func(t *testing.T) {
-		cc := &CookieCrypt{Keys: []string{testKey1}}
+		cc := &Cookiecrypt{Keys: []string{testKey1}}
 		require.NoError(t, cc.provision())
 		assert.Equal(t, "cc_", cc.prefix)
 	})
 
 	t.Run("explicitly empty prefix enables no-prefix mode", func(t *testing.T) {
-		cc := &CookieCrypt{Keys: []string{testKey1}, Prefix: ptr("")}
+		cc := &Cookiecrypt{Keys: []string{testKey1}, Prefix: ptr("")}
 		require.NoError(t, cc.provision())
 		assert.Equal(t, "", cc.prefix)
 	})
 }
 
 func TestValidate(t *testing.T) {
-	valid := func() *CookieCrypt {
-		return &CookieCrypt{Keys: []string{testKey1}, Prefix: ptr("cc_"), MaxCookieSize: 4096}
+	valid := func() *Cookiecrypt {
+		return &Cookiecrypt{Keys: []string{testKey1}, Prefix: ptr("cc_"), MaxCookieSize: 4096}
 	}
 
 	t.Run("ok", func(t *testing.T) {
@@ -187,7 +187,7 @@ func TestValidate(t *testing.T) {
 func TestEncryptDecryptRoundTrip(t *testing.T) {
 	for _, cipherName := range []string{CipherAESGCM, CipherChaCha20Poly1305} {
 		t.Run(cipherName, func(t *testing.T) {
-			cc := newCC(t, func(cc *CookieCrypt) { cc.Cipher = cipherName })
+			cc := newCC(t, func(cc *Cookiecrypt) { cc.Cipher = cipherName })
 
 			ct := mustEncrypt(t, cc, "session", "value-123")
 			pt, err := cc.decrypt("session", ct)
@@ -244,7 +244,7 @@ func TestFIPSOnlyMode(t *testing.T) {
 	if os.Getenv("COOKIECRYPT_FIPS_CHILD") == "1" {
 		require.True(t, fips140.Enabled(), "GODEBUG=fips140=only did not engage")
 
-		cc := &CookieCrypt{Keys: []string{testKey1}}
+		cc := &Cookiecrypt{Keys: []string{testKey1}}
 		require.NoError(t, cc.provision())
 		ct, err := encrypt(cc.aeads[0], "session", "value")
 		require.NoError(t, err)
@@ -252,7 +252,7 @@ func TestFIPSOnlyMode(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, "value", pt)
 
-		chacha := &CookieCrypt{Keys: []string{testKey1}, Cipher: CipherChaCha20Poly1305}
+		chacha := &Cookiecrypt{Keys: []string{testKey1}, Cipher: CipherChaCha20Poly1305}
 		err = chacha.provision()
 		if !chachaFIPSEnforced {
 			require.NoError(t, err) // pre-1.26 x/crypto cannot detect FIPS-only mode
@@ -298,7 +298,7 @@ func TestWireFormatCompatibleWithManualNonceGCM(t *testing.T) {
 
 func TestKeyRotation(t *testing.T) {
 	oldCC := newCC(t, nil) // key1 only
-	newCCBoth := newCC(t, func(cc *CookieCrypt) { cc.Keys = []string{testKey2, testKey1} })
+	newCCBoth := newCC(t, func(cc *Cookiecrypt) { cc.Keys = []string{testKey2, testKey1} })
 
 	// A cookie minted under the old key still decrypts after rotation.
 	oldCT := mustEncrypt(t, oldCC, "session", "v1")
