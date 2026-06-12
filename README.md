@@ -21,7 +21,7 @@ xcaddy build --with github.com/sebdroid/cookiecrypt
 ```
 
 > [!IMPORTANT]
-> Requires Caddy v2.11.2 or newer - the oldest release that supports this module's cryptography and has no known vulnerabilities in its dependencies. Building with any newer Caddy works automatically: Go always selects the newer of your Caddy version and this minimum.
+> Requires Caddy v2.11.3 or newer - the oldest release that supports this module's cryptography and has no known vulnerabilities in its dependencies. Building with any newer Caddy works automatically: Go always selects the newer of your Caddy version and this minimum.
 
 ## Sample Caddyfile
 
