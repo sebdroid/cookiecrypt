@@ -1,3 +1,5 @@
+// Package cookiecrypt provides Caddy HTTP middleware that encrypts cookies
+// in transit.
 package cookiecrypt
 
 import (
@@ -24,13 +26,13 @@ type Cookiecrypt struct {
 	// Prefix marks encrypted cookie names (default "cc_" when omitted) and is
 	// a reserved namespace. Explicitly empty enables no-prefix mode: every
 	// inbound cookie is presumed ciphertext, and bare cookies are dropped
-	// unless they match AllowInbound or AllowOutbound.
+	// unless they match allow_inbound or allow_outbound.
 	Prefix *string `json:"prefix,omitempty"`
 	// BlockUnencrypted drops bare (unencrypted) client cookies unless their
-	// name matches AllowInbound.
+	// name matches allow_inbound.
 	BlockUnencrypted bool `json:"block_unencrypted,omitempty"`
-	// AllowInbound exempts bare client cookies from BlockUnencrypted
-	// (path.Match globs, "!" negates). Names matching AllowOutbound are
+	// AllowInbound exempts bare client cookies from block_unencrypted
+	// (path.Match globs, "!" negates). Names matching allow_outbound are
 	// accepted automatically.
 	AllowInbound []string `json:"allow_inbound,omitempty"`
 	// AllowOutbound cookies are passed through verbatim on responses instead
