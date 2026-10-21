@@ -62,9 +62,11 @@ func TestResponseEncryptsOnExplicitWriteHeader(t *testing.T) {
 	assert.Equal(t, http.StatusCreated, rec.Code)
 	lines := rec.Header().Values("Set-Cookie")
 	require.Len(t, lines, 1)
-	assert.True(t, strings.HasPrefix(lines[0], "cc_X="), lines[0])
-	assert.True(t, strings.HasSuffix(lines[0], "; Path=/"), lines[0])
-	assert.NotContains(t, lines[0], "X=v")
+	c, err := http.ParseSetCookie(lines[0])
+	require.NoError(t, err, lines[0])
+	assert.Equal(t, "cc_X", c.Name)
+	assert.NotEqual(t, "v", c.Value)
+	assert.Equal(t, "/", c.Path)
 }
 
 func TestResponseEncryptsOnImplicitWrite(t *testing.T) {
