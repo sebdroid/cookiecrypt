@@ -1,4 +1,4 @@
-name: Sync README Caddy floor
+name: Sync README floors
 
 permissions:
     contents: write
@@ -22,17 +22,23 @@ jobs:
             - uses: actions/checkout@v6
               with:
                   ref: ${{ github.head_ref }}
-            - name: Update the README floor to match go.mod
+            - name: Update the README floors to match go.mod
               run: |
+                  GO=$(awk '$1 == "go" {print $2}' go.mod)
                   CADDY=$(awk '$1 == "github.com/caddyserver/caddy/v2" {print $2}
                                $1 == "require" && $2 == "github.com/caddyserver/caddy/v2" {print $3}' go.mod)
-                  # Strict format check: blocks sed injection and skips
+                  # Strict format checks: block sed injection and skip
                   # pseudo-versions, which do not belong in the README.
-                  if ! echo "$CADDY" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
-                      echo "no clean Caddy release version in go.mod (got '$CADDY'), skipping" >&2
-                      exit 0
+                  if echo "$GO" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+                      sed -i -E "s|Requires Go [0-9]+\.[0-9]+\.[0-9]+ or newer|Requires Go ${GO} or newer|" README.md
+                  else
+                      echo "no full Go version in go.mod (got '$GO'), skipping" >&2
                   fi
-                  sed -i -E "s|Requires Caddy v[0-9]+\.[0-9]+\.[0-9]+ or newer|Requires Caddy ${CADDY} or newer|" README.md
+                  if echo "$CADDY" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+                      sed -i -E "s|Requires Caddy v[0-9]+\.[0-9]+\.[0-9]+ or newer|Requires Caddy ${CADDY} or newer|" README.md
+                  else
+                      echo "no clean Caddy release version in go.mod (got '$CADDY'), skipping" >&2
+                  fi
             - name: Commit and push if changed
               run: |
                   if git diff --quiet README.md; then
@@ -41,5 +47,5 @@ jobs:
                   fi
                   git config user.name "github-actions[bot]"
                   git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-                  git commit -am "docs: sync README Caddy floor with go.mod"
+                  git commit -am "docs: sync README floors with go.mod"
                   git push

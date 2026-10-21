@@ -238,8 +238,8 @@ func TestDecryptRejects(t *testing.T) {
 
 // TestFIPSOnlyMode re-executes this test in a child process with
 // GODEBUG=fips140=only: the default AES-GCM cipher must keep working (it uses
-// NewGCMWithRandomNonce, the FIPS-approved construction), and on Go 1.26+
-// chacha20-poly1305 must fail at provision with guidance pointing at aes-gcm.
+// NewGCMWithRandomNonce, the FIPS-approved construction), and chacha20-poly1305
+// must fail at provision with guidance pointing at aes-gcm.
 func TestFIPSOnlyMode(t *testing.T) {
 	if os.Getenv("COOKIECRYPT_FIPS_CHILD") == "1" {
 		require.True(t, fips140.Enabled(), "GODEBUG=fips140=only did not engage")
@@ -254,10 +254,6 @@ func TestFIPSOnlyMode(t *testing.T) {
 
 		chacha := &Cookiecrypt{Keys: []string{testKey1}, Cipher: CipherChaCha20Poly1305}
 		err = chacha.provision()
-		if !chachaFIPSEnforced {
-			require.NoError(t, err) // pre-1.26 x/crypto cannot detect FIPS-only mode
-			return
-		}
 		require.Error(t, err)
 		require.Contains(t, err.Error(), CipherChaCha20Poly1305)
 		require.Contains(t, err.Error(), CipherAESGCM) // actionable guidance
