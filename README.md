@@ -21,7 +21,9 @@ xcaddy build --with github.com/sebdroid/cookiecrypt
 ```
 
 > [!IMPORTANT]
-> Requires Caddy v2.11.4 or newer - the oldest release that supports this module's cryptography and has no known vulnerabilities in its dependencies. Building with any newer Caddy works automatically: Go always selects the newer of your Caddy version and this minimum.
+> Requires Caddy v2.11.7 or newer - the oldest release with no known vulnerabilities in its dependencies. Building with any newer Caddy works automatically: Go always selects the newer of your Caddy version and this minimum.
+>
+> Requires Go 1.26.10 or newer - with the default `GOTOOLCHAIN=auto`, `go` and `xcaddy` download a matching toolchain automatically; the official `golang` and `caddy:builder` images set `GOTOOLCHAIN=local` and refuse an older one instead. A newer major with an older patch level also satisfies this minimum, so build with the latest patch release of your Go major.
 
 ## Sample Caddyfile
 
@@ -83,7 +85,7 @@ Patterns in both lists are [`path.Match`](https://pkg.go.dev/path#Match) globs: 
 | `chacha20-poly1305` | RFC 8439                     | Faster on CPUs without AES instructions; not FIPS |
 
 > [!NOTE]
-> **FIPS environments:** Only `aes-gcm` works under `GODEBUG=fips140=only`. `chacha20-poly1305` is not an approved algorithm; when Caddy is built with Go 1.26 or newer, FIPS-only mode refuses to load a `chacha20-poly1305` config with an error pointing back to `aes-gcm`. Builds on older toolchains cannot detect FIPS-only mode and will run it regardless - build with Go 1.26+ if FIPS compliance matters to you.
+> **FIPS environments:** Only `aes-gcm` works under `GODEBUG=fips140=only`. `chacha20-poly1305` is not an approved algorithm; FIPS-only mode refuses to load a `chacha20-poly1305` config with an error pointing back to `aes-gcm`.
 
 ### Key rotation
 
